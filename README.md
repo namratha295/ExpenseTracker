@@ -1,97 +1,148 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Expense Tracker
 
-# Getting Started
+A React Native app to log expenses across multiple currencies with real-time conversion to a selected base currency.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+![React Native](https://img.shields.io/badge/React_Native-0.85-20232A?style=flat&logo=react&logoColor=61DAFB)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.x-007ACC?style=flat&logo=typescript&logoColor=white)
+![Redux Toolkit](https://img.shields.io/badge/Redux_Toolkit-2.x-764ABC?style=flat&logo=redux&logoColor=white)
+![Axios](https://img.shields.io/badge/Axios-1.x-5A29E4?style=flat&logo=axios&logoColor=white)
 
-## Step 1: Start Metro
+---
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+## Features
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+- Log expenses in any currency — INR, USD, EUR, GBP, JPY, AUD
+- Real-time conversion to a selected base currency via live exchange rates
+- Switch base currency from the home screen — all amounts recalculate instantly
+- Filter expenses by category: Food, Travel, Shopping, Health, Entertainment, Other
+- Running total always shown in the selected base currency
+- Delete expenses with a single tap
+- Full TypeScript — no `any`
 
-```sh
-# Using npm
-npm start
+---
 
-# OR using Yarn
-yarn start
+## Tech Stack
+
+- **React Native 0.85** · **TypeScript**
+- **Redux Toolkit** — slices, `createAsyncThunk`, typed hooks
+- **Axios** — centralised instance with response interceptor
+- **react-native-vector-icons** — Ionicons for UI icons
+- **Frankfurter API v2** — free exchange rate API, no key needed
+
+---
+
+## Architecture
+
+Follows a **Service → Controller → Slice** pattern.
+
+```
+Screen
+  └── dispatch(thunk)
+        └── Controller      ← business logic, validation, data transformation
+              └── Service   ← raw HTTP call only
+                    └── Axios instance
 ```
 
-## Step 2: Build and run your app
+- **Services** — one function per endpoint, no logic
+- **Controllers** — validation, object creation, data transformation
+- **Slices** — state shape and transitions only, no business logic
+- **Screens** — collect input, dispatch, render state
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+---
 
-### Android
+## Project Structure
 
-```sh
-# Using npm
-npm run android
-
-# OR using Yarn
-yarn android
+```
+src/
+├── types/
+│   └── index.ts                    # Shared TypeScript interfaces and union types
+├── services/
+│   ├── api.ts                      # Axios instance with base URL + interceptor
+│   └── currencyService.ts          # fetchRates() — raw API call, transforms array response
+├── controllers/
+│   ├── currencyController.ts       # getRates(), convertToBase()
+│   └── expenseController.ts        # createExpense(), validateExpense()
+├── store/
+│   ├── index.ts                    # configureStore, RootState, AppDispatch
+│   └── hooks.ts                    # useAppDispatch, useAppSelector (typed)
+├── features/
+│   ├── currency/
+│   │   └── currencySlice.ts        # loadRates thunk, setBaseCurrency
+│   └── expenses/
+│       └── expenseSlice.ts         # addExpense, removeExpense, setFilter, updateConvertedAmounts
+└── screens/
+    ├── HomeScreen.tsx              # Expense list, filter strip, base switcher, total
+    └── AddExpenseScreen.tsx        # Add expense form with fixed bottom button
 ```
 
-### iOS
+---
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+## Getting Started
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+### Prerequisites
 
-```sh
-bundle install
+- Node.js 18+
+- Android Studio + Android SDK
+- React Native environment: [official guide](https://reactnative.dev/docs/set-up-your-environment)
+
+### Install
+
+```bash
+git clone https://github.com/namratha295/expense-tracker.git
+cd expense-tracker
+npm install
 ```
 
-Then, and every time you update your native dependencies, run:
+### Run
 
-```sh
-bundle exec pod install
+```bash
+npx react-native run-android
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+---
 
-```sh
-# Using npm
-npm run ios
+## Key Implementation Notes
 
-# OR using Yarn
-yarn ios
+### API response transformation
+The Frankfurter v2 API returns an array of `{ base, quote, rate }` objects. The service layer transforms this into a `Record<string, number>` map before it reaches Redux — so the rest of the app never deals with the raw array shape.
+
+```ts
+response.data.forEach(item => {
+  rates[item.quote] = item.rate;
+});
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+### Axios interceptor
+All API errors are caught centrally in `src/services/api.ts` with three specific cases — server error (4xx/5xx), no response (network down), and request setup failure. One place to update error handling for the whole app.
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+### createAsyncThunk
+The currency slice uses `createAsyncThunk` to handle the loading/success/error lifecycle automatically. The thunk calls the controller, not the service directly.
 
-## Step 3: Modify your app
+### Typed Redux hooks
+`useAppDispatch` and `useAppSelector` in `src/store/hooks.ts` are typed wrappers — all components use these, never the plain Redux hooks.
 
-Now that you have successfully run the app, let's make changes!
+### useMemo for performance
+Filtered expense list and running total are memoised — only recalculate when `items` or `filterCategory` change, not on every render.
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+### Base currency switching
+Tapping the base currency in the header opens a bottom sheet modal. Selecting a new currency dispatches `setBaseCurrency` and `loadRates` — fresh rates are fetched and all `convertedAmounts` recalculate automatically via `useEffect`.
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+---
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+## API
 
-## Congratulations! :tada:
+[Frankfurter v2](https://frankfurter.dev) — free, open-source, no API key required.
 
-You've successfully run and modified your React Native App. :partying_face:
+```
+GET https://api.frankfurter.dev/v2/rates?base=INR
+```
 
-### Now what?
+<img width="360" height="800" alt="Screenshot_1781023364" src="https://github.com/user-attachments/assets/79ad4816-2b3f-45d2-a38d-9102393aedb3" />
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
+<img width="360" height="800" alt="Screenshot_1781023370" src="https://github.com/user-attachments/assets/a682f478-ede4-4d34-9c64-cc3752592481" />
 
-# Troubleshooting
+<img width="360" height="800" alt="Screenshot_1781023383" src="https://github.com/user-attachments/assets/7cce6b48-32d2-4eef-8a57-b1a42972ff30" />
 
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+<img width="360" height="800" alt="Screenshot_1781023387" src="https://github.com/user-attachments/assets/fbfed374-b53f-47c2-8c6a-187dee157cff" />
 
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+<img width="360" height="800" alt="Screenshot_1781023395" src="https://github.com/user-attachments/assets/8393ba27-380e-478c-a30b-42f5c54253fb" />
