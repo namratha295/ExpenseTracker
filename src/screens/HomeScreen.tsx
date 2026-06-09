@@ -1,14 +1,17 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Icon from 'react-native-vector-icons/Ionicons';
 import {
     View, Text, FlatList, TouchableOpacity,
     StyleSheet, ActivityIndicator,
     SafeAreaView,
+    Modal,
 } from 'react-native';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { loadRates } from '../features/currency/CurrencySlice';
 import { removeExpense, setFilter, updateConvertedAmounts } from '../features/expenses/ExpenseSlice';
-import { Category, Expense } from '../types';
+import { Category, Expense, Currency } from '../types';
+import { setBaseCurrency } from '../features/currency/CurrencySlice';
+
 
 const CATEGORIES: Array<Category | 'All'> = ['All', 'Food', 'Travel', 'Shopping', 'Health', 'Entertainment', 'Other'];
 
@@ -17,6 +20,7 @@ interface Props {
 }
 
 const HomeScreen: React.FC<Props> = ({ onAddPress }) => {
+    const [showSwitcher, setShowSwitcher] = useState(false);
     const dispatch = useAppDispatch();
     const { base, rates, loading, error, lastUpdated } = useAppSelector(s => s.currency);
     const { items, filterCategory } = useAppSelector(s => s.expenses);
@@ -28,6 +32,9 @@ const HomeScreen: React.FC<Props> = ({ onAddPress }) => {
 
     // Recalculate converted amounts whenever rates change
     useEffect(() => {
+        console.log('rates:', rates);
+        console.log('base:', base);
+        console.log('items before update:', items);
         if (rates && Object.keys(rates).length > 0) {
             dispatch(updateConvertedAmounts({ rates, base }));
         }
@@ -65,10 +72,15 @@ const HomeScreen: React.FC<Props> = ({ onAddPress }) => {
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
                 <Text style={styles.heading}>Expense Tracker</Text>
-                <Text style={styles.subheading}>Base: {base} · Total: {total}</Text>
+                {/* <Text style={styles.subheading}>Base: {base} · Total: {total}</Text> */}
                 {lastUpdated && <Text style={styles.updated}>Rates updated: {lastUpdated}</Text>}
                 {loading && <ActivityIndicator size="small" color="#6366f1" />}
                 {error && <Text style={styles.error}>{error}</Text>}
+                <TouchableOpacity onPress={() => setShowSwitcher(true)}>
+                    <Text style={styles.subheading}>
+                        Base: {base} · Total: {total} ▾
+                    </Text>
+                </TouchableOpacity>
             </View>
 
             {/* Category filter */}
@@ -101,6 +113,40 @@ const HomeScreen: React.FC<Props> = ({ onAddPress }) => {
             <TouchableOpacity style={styles.fab} onPress={onAddPress}>
                 <Text style={styles.fabText}>+ Add</Text>
             </TouchableOpacity>
+
+
+            <Modal
+                visible={showSwitcher}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowSwitcher(false)}
+            >
+                <TouchableOpacity
+                    style={styles.overlay}
+                    onPress={() => setShowSwitcher(false)}
+                    activeOpacity={1}
+                >
+                    <View style={styles.switcher}>
+                        <Text style={styles.switcherTitle}>Select base currency</Text>
+                        {(['INR', 'USD', 'EUR', 'GBP', 'JPY', 'AUD'] as Currency[]).map(c => (
+                            <TouchableOpacity
+                                key={c}
+                                style={[styles.switcherRow, base === c && styles.switcherRowActive]}
+                                onPress={() => {
+                                    dispatch(setBaseCurrency(c));
+                                    dispatch(loadRates(c));
+                                    setShowSwitcher(false);
+                                }}
+                            >
+                                <Text style={[styles.switcherText, base === c && styles.switcherTextActive]}>
+                                    {c}
+                                </Text>
+                                {base === c && <Icon name="checkmark" size={18} color="#6366f1" />}
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </TouchableOpacity>
+            </Modal>
         </SafeAreaView>
     );
 };
@@ -186,4 +232,34 @@ const styles = StyleSheet.create({
     empty: { textAlign: 'center', color: '#94a3b8', marginTop: 60, fontSize: 15 },
     fab: { position: 'absolute', bottom: 32, right: 24, backgroundColor: '#6366f1', paddingHorizontal: 24, paddingVertical: 14, borderRadius: 30, elevation: 4 },
     fabText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+    overlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        justifyContent: 'flex-end',
+    },
+    switcher: {
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 20,
+    },
+    switcherTitle: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#94a3b8',
+        marginBottom: 12,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    switcherRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 14,
+        borderBottomWidth: 0.5,
+        borderBottomColor: '#e2e8f0',
+    },
+    switcherRowActive: { backgroundColor: '#f5f3ff' },
+    switcherText: { fontSize: 16, color: '#1e293b' },
+    switcherTextActive: { color: '#6366f1', fontWeight: '600' },
 });
