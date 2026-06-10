@@ -136,6 +136,8 @@ Tapping the base currency in the header opens a bottom sheet modal. Selecting a 
 ```
 GET https://api.frankfurter.dev/v2/rates?base=INR
 ```
+## Download
+[Download APK v1.0.0](https://github.com/namratha295/ExpenseTracker/releases/latest)
 
 <img width="360" height="800" alt="Screenshot_1781023364" src="https://github.com/user-attachments/assets/79ad4816-2b3f-45d2-a38d-9102393aedb3" />
 
